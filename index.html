@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <title>GIP News</title>
+ 
+ <link rel="preconnect" href="https://fonts.googleapis.com">
+ <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+ <link id="google-fonts-link" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap" rel="stylesheet">
+
+ <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+ <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
+ 
+ <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+ <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+ 
+ <style>
+ /* --- 2.1: Variáveis e Layout Base --- */
+ :root { --primary: #2b3e50; --bg: #f4f7f6; --accent: #fe3e09; }
+ 
+ @media screen {
+   body { font-family: 'Arial', sans-serif; margin: 0; background: var(--bg); display: flex; height: 100vh; overflow: hidden; }
+   #editor-panel { width: 45%; padding: 20px 30px; background: #ededf5; overflow-y: auto; box-shadow: 2px 0 10px rgba(0,0,0,0.05); box-sizing: border-box; }
+   #preview-panel { width: 55%; padding: 40px 20px; overflow-y: auto; display: flex; flex-direction: column; align-items: center; background: #fcfcfc; box-sizing: border-box; }
+   #render-area { background: white; box-shadow: 0 0 10px rgba(0,0,0,0.1); transition: width 0.3s ease; width: 650px; }
+   .no-print { display: block; }
+ }
+
+ /* --- 2.2: Ocultar painéis na hora de imprimir/salvar PDF nativo --- */
+ @media print {
+   body { background: white !important; display: block !important; overflow: visible !important; }
+   #editor-panel, .no-print, .btn, hr { display: none !important; }
+   #preview-panel { width: 100% !important; padding: 0 !important; background: white !important; overflow: visible !important; display: block !important; }
+   #render-area { background: white !important; box-shadow: none !important; margin: 0 auto !important; display: block !important; }
+ }
+
+ /* --- 2.3: Tipografia do Editor --- */
+ h2, h3 { font-weight: 800; color: var(--primary); margin-top: 0; padding-bottom: 5px; }
+ h2 { border-bottom: 2px solid var(--primary); padding-bottom: 10px; }
+ label { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #333; display: block; margin-bottom: 5px; margin-top: 10px; }
+ 
+ /* --- 2.4: Componentes de Interface (Cards, Botões e Inputs) --- */
+ .config-group { background: #ffffff; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ced4da; }
+ .session-container { background: #ffffff; padding: 15px; border-radius: 8px; margin-bottom: 25px; border: 1px solid #ced4da; border-left: 6px solid #6c757d; }
+ .session-title { font-size: 13px; font-weight: 800; text-transform: uppercase; margin-bottom: 15px; color: #495057; display: flex; justify-content: space-between; align-items: center; background: #f1f3f5; padding: 8px 12px; border-radius: 4px; cursor: pointer; user-select: none; }
+ .session-actions { display: flex; gap: 5px; }
+ 
+ .btn-action { background: #fff; border: 1px solid #ccc; padding: 4px 8px; font-size: 12px; border-radius: 4px; cursor: pointer; transition: 0.1s; font-weight: normal; text-transform: none; }
+ .btn-action:hover { background: #e2e6ea; border-color: #adb5bd; }
+ .btn-delete { color: #fff; background: #dc3545; border-color: #dc3545; }
+ .btn-delete:hover { background: #c82333; border-color: #bd2130; }
+
+ input[type="text"], select, input[type="number"] { width: 100%; box-sizing: border-box; margin-bottom: 12px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+ .inline-row { display: flex; gap: 15px; }
+ .inline-row > div { flex: 1; }
+ 
+ /* Inputs de Cor Personalizados */
+ .color-input-group { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+ input[type="color"] { width: 50px; height: 34px; border: 1px solid #ccc; cursor: pointer; display: block; border-radius: 4px; padding: 0; }
+ .color-input-group input[type="text"] { margin-bottom: 0; flex: 1; font-family: monospace; }
+
+ /* Botões Principais */
+ .btn { padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: 700; margin-bottom: 10px; width: 100%; text-transform: uppercase; letter-spacing: 0.5px; transition: 0.2s; text-align: center; font-size: 13px; }
+ .btn-add { background: var(--primary); color: white; margin-bottom: 20px; }
+ .btn-add:hover { background: #1a2632; }
+ .btn-export { background: #28a745; color: white; }
+ .btn-export:hover { background: #218838; }
+ .btn-pdf { background: #ff8400; color: white; }
+ .btn-pdf:hover { background: #d35400; }
+ .btn-html { background: #6f42c1; color: white; }
+ .btn-html:hover { background: #5a32a3; }
+ .btn-template { background: #17a2b8; color: white; }
+ .btn-template:hover { background: #138496; }
+
+ /* --- 2.5: Sistema de Grid e Minimização --- */
+ .grid-editors { display: flex; gap: 15px; margin-top: 15px; flex-direction: column; }
+ .block-box { background: #fdfdfd; padding: 15px; border-radius: 6px; border: 1px dashed #ced4da; flex: 1; }
+ .session-container.collapsed .content-wrapper { display: none; }
+ .session-container.collapsed { margin-bottom: 15px; padding-bottom: 10px; }
+ .session-container.collapsed .session-title { margin-bottom: 0; }
+
+ /* --- 2.6: Customizações do Quill Editor --- */
+ .quill-editor { background: white; height: 260px; margin-bottom: 10px; }
+ .editor-wrapper { height: 320px; margin-bottom: 10px; }
+ .ql-editor img, #render-area img { max-width: 100% !important; height: auto !important; cursor: pointer; }
+ .ql-editor { word-break: break-word; overflow-wrap: break-word; }
+ 
+ /* Correção de alinhamento nativo de imagens no editor Quill */
+ .ql-editor .ql-align-center img, #render-area .ql-align-center img { margin-left: auto !important; margin-right: auto !important; display: block !important; }
+ .ql-editor .ql-align-right img, #render-area .ql-align-right img { margin-left: auto !important; margin-right: 0 !important; display: block !important; }
+ .ql-editor .ql-align-left img, #render-area .ql-align-left img { margin-left: 0 !important; margin-right: auto !important; display: block !important; }
+ .ql-align-center { text-align: center; }
+ .ql-align-right { text-align: right; }
+ .ql-align-left { text-align: left; }
+
+ /* Seletores de cor nativos injetados no Toolbar do Quill */
+ .custom-ql-color { width: 28px !important; height: 24px !important; border: 1px solid #ccc !important; border-radius: 3px; cursor: pointer; padding: 0 !important; display: inline-block; vertical-align: middle; }
+ .custom-color-wrapper { display: inline-flex; gap: 6px; align-items: center; padding: 0 4px; margin-right: 10px; border-right: 1px solid #ccc; padding-right: 10px; }
+
+ /* --- 2.7: Preview Visual --- */
+ /* Placeholders pontilhados (só aparecem no hover, não vão pro HTML final) */
+ #render-area td { border: 1px dashed transparent; transition: border 0.3s; }
+ #render-area:hover td { border: 1px dashed #d1d5db; }
+ </style>
+</head>
+<body>
+
+<div id="editor-panel" class="no-print">
+ <h2>GIP News - Editor</h2>
+
+ <div class="config-group">
+   <h3>Configurações</h3>
+   <div class="inline-row">
+     <div>
+       <label>Largura do Canvas (px)</label>
+       <input type="number" id="canvas-width" value="650" min="400" max="900" oninput="mudarLarguraCanvas(this.value)">
+     </div>
+     <div>
+       <label>Tipografia Geral</label>
+       <select id="global-font" onchange="mudarFonteGlobal(this.value)">
+         <option value="'Inter', Arial, sans-serif">Inter</option>
+         <option value="'Arial', sans-serif">Arial</option>
+         <option value="'Roboto', sans-serif">Roboto</option>
+         <option value="'Open Sans', sans-serif">Open Sans</option>
+         <option value="'Montserrat', sans-serif">Montserrat</option>
+         <option value="'Georgia', serif">Georgia</option>
+         <option value="'Verdana', sans-serif">Verdana</option>
+         <option value="custom" style="font-weight: bold; color: var(--accent);">🔍 Outra Fonte (Google Fonts)...</option>
+       </select>
+     </div>
+   </div>
+
+     <div class="inline-row" style="margin-top: 5px;">
+         <div><button class="btn btn-template" style="padding: 8px; font-size:11px;" onclick="exportarTemplateJSON()">💾 Salvar Template</button></div>
+     <div>
+       <button class="btn btn-template" style="padding: 8px; font-size:11px; background:#6c757d;" onclick="document.getElementById('import-file').click()">📂 Importar Template</button>
+       <input type="file" id="import-file" style="display:none;" accept=".json" onchange="importarTemplateJSON(event)">
+     </div>
+   </div>
+ </div>
+
+ <button class="btn btn-add" onclick="adicionarNovaSessao()">➕ Adicionar Nova Sessão</button>
+ 
+ <div id="lista-sessoes"></div>
+ 
+ <hr style="border:0; border-top:1px solid #ccc; margin:20px 0;">
+ 
+ <button class="btn btn-pdf" onclick="gerarPDFDinamico()">📥 Salvar / Imprimir PDF</button>
+ <button class="btn btn-export" onclick="exportarEmail()">📋 Copiar para E-mail (Visual)</button>
+ <button class="btn btn-html" onclick="exportarHTML()">💻 Copiar Código HTML</button>
+</div>
+
+<div id="preview-panel">
+ <p style="font-size: 11px; color: #888; margin-top: -20px; margin-bottom: 20px;">*Passe o mouse sobre a área abaixo para visualizar as divisões de bloco.</p>
+ 
+ <div id="render-area"></div>
+</div>
+
+<script src="config.js"></script>
+
+<script>
+/** * ---------------------------------------------------------
+ * 4.1. VARIÁVEIS DE ESTADO (STORE GLOBAL)
+ * ---------------------------------------------------------
+ */
+
+let configuracaoGlobal = { width: 650, fontFamily: "'Inter', Arial, sans-serif" };
+let sessoesDados = []; // Armazena a estrutura de blocos e textos
+let instanciasQuill = {}; // Armazena as instâncias ativas do editor
+let sessoesColapsadas = {}; // Controle de UI (quais sessões estão minimizadas)
+
+const toolbarQuill = [
+  [{ 'header': [1, 2, 3, false] }],
+  ['bold', 'italic', 'underline', 'link', 'image'],
+  [{ 'align': [] }],
+  [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+  ['clean']
+];
+
+
+/** * ---------------------------------------------------------
+ * 4.2. INICIALIZAÇÃO E PERSISTÊNCIA (LOCALSTORAGE)
+ * ---------------------------------------------------------
+ */
+function init() {
+  const cache = localStorage.getItem('cms_modular_save_v1');
+  if (cache) {
+    try {
+      const dados = JSON.parse(cache);
+      configuracaoGlobal = Object.assign(configuracaoGlobal, dados.configuracaoGlobal);
+      sessoesDados = dados.sessoesDados || [];
+      
+      let fontExiste = false;
+      const selectFont = document.getElementById('global-font');
+      for(let i=0; i<selectFont.options.length; i++) {
+        if(selectFont.options[i].value === configuracaoGlobal.fontFamily) { fontExiste = true; break; }
+      }
+      if(!fontExiste && configuracaoGlobal.fontFamily !== 'custom') {
+        const novaOpt = document.createElement('option');
+        novaOpt.value = configuracaoGlobal.fontFamily;
+        novaOpt.text = configuracaoGlobal.fontFamily.replace(/['"]/g, '');
+        selectFont.insertBefore(novaOpt, selectFont.lastElementChild);
+      }
+
+      document.getElementById('canvas-width').value = configuracaoGlobal.width;
+      document.getElementById('global-font').value = configuracaoGlobal.fontFamily;
+      carregarLinkGoogleFonts(configuracaoGlobal.fontFamily);
+    } catch (e) {
+      console.error("Erro ao ler cache local");
+    }
+  }
+
+  if (sessoesDados.length === 0) sessoesDados.push(criarObjetoSessao('1-col'));
+
+  renderizarPainelEditor();
+  atualizarPreview();
+}
+
+function salvarCacheLocal() {
+  try {
+    const dados = { configuracaoGlobal, sessoesDados };
+    localStorage.setItem('cms_modular_save_v1', JSON.stringify(dados));
+  } catch (error) {
+    console.warn("Limite de armazenamento excedido. Cache ignorado preventivamente.");
+  }
+}
+
+
+/** * ---------------------------------------------------------
+ * 4.3. MANIPULAÇÃO DE SESSÕES (CRUD)
+ * ---------------------------------------------------------
+ */
+function criarObjetoSessao(layoutTipo) {
+  let qtdeBlocos = 1;
+  if (layoutTipo.startsWith('2-col')) qtdeBlocos = 2;
+  if (layoutTipo === '3-col-equal') qtdeBlocos = 3;
+
+  let blocos = [];
+  for (let i = 0; i < qtdeBlocos; i++) blocos.push({ texto: `<p>Conteúdo do Bloco ${i+1}</p>` });
+
+  return {
+    id: 'sessao_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+    layout: layoutTipo,
+    corFundo: '#ffffff',
+    blocos: blocos
+  };
+}
+
+function adicionarNovaSessao() {
+  sessoesDados.push(criarObjetoSessao('1-col'));
+  salvarCacheLocal();
+  renderizarPainelEditor();
+  atualizarPreview();
+}
+
+function excluirSessao(idSessao) {
+  if(confirm("Deseja realmente excluir esta sessão?")) {
+    const index = sessoesDados.findIndex(s => s.id === idSessao);
+    if (index > -1) {
+      sessoesDados.splice(index, 1);
+      salvarCacheLocal();
+      renderizarPainelEditor();
+      atualizarPreview();
+    }
+  }
+}
+
+function duplicarSessao(idSessao) {
+  const index = sessoesDados.findIndex(s => s.id === idSessao);
+  if (index === -1) return;
+
+  const copia = JSON.parse(JSON.stringify(sessoesDados[index]));
+  copia.id = 'sessao_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5); // Gera novo ID
+  sessoesDados.splice(index + 1, 0, copia);
+  
+  salvarCacheLocal();
+  renderizarPainelEditor();
+  atualizarPreview();
+}
+
+function moverSessao(idSessao, direcao) {
+  const index = sessoesDados.findIndex(s => s.id === idSessao);
+  if (index === -1) return;
+
+  if (direcao === 'cima' && index > 0) {
+    let temp = sessoesDados[index];
+    sessoesDados[index] = sessoesDados[index - 1];
+    sessoesDados[index - 1] = temp;
+  } else if (direcao === 'baixo' && index < sessoesDados.length - 1) {
+    let temp = sessoesDados[index];
+    sessoesDados[index] = sessoesDados[index + 1];
+    sessoesDados[index + 1] = temp;
+  }
+  salvarCacheLocal();
+  renderizarPainelEditor();
+  atualizarPreview();
+}
+
+function alterarLayoutSessao(idSessao, novoLayout) {
+  const index = sessoesDados.findIndex(s => s.id === idSessao);
+  if (index === -1) return;
+
+  const antiga = sessoesDados[index];
+  const novaSessao = criarObjetoSessao(novoLayout);
+  novaSessao.corFundo = antiga.corFundo;
+  novaSessao.id = antiga.id; // Mantém a amarração visual
+  
+  // Tenta salvar o conteúdo digitado caso a nova estrutura permita
+  for(let i=0; i < novaSessao.blocos.length; i++) {
+    if(antiga.blocos[i]) novaSessao.blocos[i].texto = antiga.blocos[i].texto;
+  }
+  
+  sessoesDados[index] = novaSessao;
+  salvarCacheLocal();
+  renderizarPainelEditor();
+  atualizarPreview();
+}
+
+
+/** * ---------------------------------------------------------
+ * 4.4. AÇÕES DE INTERFACE (UI E CONFIG)
+ * ---------------------------------------------------------
+ */
+function toggleSessao(idSessao) {
+  const elemento = document.getElementById(`box-${idSessao}`);
+  if(elemento) {
+    elemento.classList.toggle('collapsed');
+    sessoesColapsadas[idSessao] = elemento.classList.contains('collapsed');
+  }
+}
+
+function mudarLarguraCanvas(valor) {
+  configuracaoGlobal.width = parseInt(valor) || 650;
+  salvarCacheLocal();
+  atualizarPreview();
+}
+
+function mudarFonteGlobal(valor) {
+  if (valor === 'custom') {
+    const customFont = prompt("Digite o nome exato da fonte do Google Fonts (ex: Open Sans, Lora):");
+    if (customFont && customFont.trim() !== "") {
+      const formattedFont = `'${customFont.trim()}', sans-serif`;
+      const selectFont = document.getElementById('global-font');
+      const novaOpt = document.createElement('option');
+      novaOpt.value = formattedFont;
+      novaOpt.text = customFont.trim();
+      selectFont.insertBefore(novaOpt, selectFont.lastElementChild);
+      
+      configuracaoGlobal.fontFamily = formattedFont;
+      selectFont.value = formattedFont;
+      carregarLinkGoogleFonts(formattedFont);
+    } else {
+      document.getElementById('global-font').value = configuracaoGlobal.fontFamily;
+      return;
+    }
+  } else {
+    configuracaoGlobal.fontFamily = valor;
+    carregarLinkGoogleFonts(valor);
+  }
+  salvarCacheLocal();
+  atualizarPreview();
+}
+
+function carregarLinkGoogleFonts(fontValue) {
+  const fontName = fontValue.split(',')[0].replace(/['"]/g, '');
+  if(['Arial', 'Georgia', 'Verdana'].includes(fontName)) return; // Ignora web-safe fonts
+  const linkEl = document.getElementById('google-fonts-link');
+  linkEl.href = `https://fonts.googleapis.com/css2?family=${fontName.replace(' ', '+')}:wght@400;700;800&display=swap`;
+}
+
+function alterarCorFundoSessao(idSessao, cor) {
+  const index = sessoesDados.findIndex(s => s.id === idSessao);
+  if (index === -1) return;
+
+  sessoesDados[index].corFundo = cor;
+  
+  // Sincroniza os inputs (O visual e o texto)
+  const inputColor = document.getElementById(`color-picker-${idSessao}`);
+  const inputText = document.getElementById(`color-text-${idSessao}`);
+  if(inputColor) inputColor.value = cor;
+  if(inputText) inputText.value = cor;
+
+  salvarCacheLocal();
+  atualizarPreview();
+}
+
+// --- FUNÇÃO DO GITHUB ATUALIZADA ---
+async function uploadImageToGitHub(file, quillInstance) {
+  const repo = GITHUB_REPO;
+  const token = GITHUB_TOKEN;
+
+  if (repo === "seu-usuario/seu-repositorio" || !token) {
+    alert("⚠️ Credenciais do GitHub não configuradas no código-fonte.");
+    return;
+  }
+
+  const range = quillInstance.getSelection(true);
+  quillInstance.insertText(range.index, '⏳ Enviando imagem para o GitHub...', 'user');
+
+  const reader = new FileReader();
+  reader.readAsDataURL(file);
+  reader.onloadend = async () => {
+    const base64Data = reader.result.split(',')[1];
+    const fileName = `img_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+    const path = `imagens/${fileName}`; 
+
+    const url = `https://api.github.com/repos/${repo}/contents/${path}`;
+
+    try {
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          message: `Upload via CMS: ${fileName}`,
+          content: base64Data
+        })
+      });
+
+      const data = await response.json();
+      quillInstance.deleteText(range.index, 36); 
+
+      if (response.ok) {
+        const downloadUrl = data.content.download_url;
+        quillInstance.insertEmbed(range.index, 'image', downloadUrl);
+        quillInstance.setSelection(range.index + 1);
+        salvarCacheLocal();
+        atualizarPreview();
+      } else {
+        alert(`Erro do GitHub: ${data.message}`);
+      }
+    } catch (err) {
+      quillInstance.deleteText(range.index, 36);
+      alert("Erro crítico de conexão com o GitHub.");
+      console.error(err);
+    }
+  };
+}
+
+
+/** * ---------------------------------------------------------
+ * 4.5. RENDERIZAÇÃO (MONTAGEM DO HTML DOM)
+ * ---------------------------------------------------------
+ */
+function renderizarPainelEditor() {
+  const container = document.getElementById('lista-sessoes');
+  container.innerHTML = '';
+  instanciasQuill = {};
+
+  sessoesDados.forEach((sessao, sIndex) => {
+    const sBox = document.createElement('div');
+    const estaColapsado = sessoesColapsadas[sessao.id] ? ' collapsed' : '';
+    sBox.className = 'session-container' + estaColapsado;
+    sBox.id = `box-${sessao.id}`;
+    sBox.style.borderLeftColor = sIndex % 2 === 0 ? 'var(--primary)' : 'var(--accent)';
+
+    let btnCima = sIndex > 0 ? `<button class="btn-action" onclick="event.stopPropagation(); moverSessao('${sessao.id}', 'cima')">▲</button>` : '';
+    let btnBaixo = sIndex < sessoesDados.length - 1 ? `<button class="btn-action" onclick="event.stopPropagation(); moverSessao('${sessao.id}', 'baixo')">▼</button>` : '';
+
+    // Estrutura HTML do Card da Sessão
+    sBox.innerHTML = `
+      <div class="session-title" onclick="toggleSessao('${sessao.id}')">
+        <span>↕ Sessão ${sIndex + 1} <small style="font-weight:normal; opacity:0.7;">(Clique para recolher)</small></span>
+        <div class="session-actions">
+          ${btnCima}
+          ${btnBaixo}
+          <button class="btn-action" onclick="event.stopPropagation(); duplicarSessao('${sessao.id}')">📋 Duplicar</button>
+          <button class="btn-action btn-delete" onclick="event.stopPropagation(); excluirSessao('${sessao.id}')">🗑️ Excluir</button>
+        </div>
+      </div>
+      <div class="content-wrapper">
+        <div class="inline-row">
+          <div>
+            <label>Estrutura</label>
+            <select onchange="alterarLayoutSessao('${sessao.id}', this.value)">
+              <option value="1-col" ${sessao.layout === '1-col' ? 'selected' : ''}>1 Bloco (100% Padrão)</option>
+              <option value="1-col-img-full" ${sessao.layout === '1-col-img-full' ? 'selected' : ''}>1 Imagem Full (100% sem bordas)</option>
+              <option value="2-col-50-50" ${sessao.layout === '2-col-50-50' ? 'selected' : ''}>2 Blocos (50/50%)</option>
+              <option value="2-col-30-70" ${sessao.layout === '2-col-30-70' ? 'selected' : ''}>2 Blocos (30/70%)</option>
+              <option value="2-col-70-30" ${sessao.layout === '2-col-70-30' ? 'selected' : ''}>2 Blocos (70/30%)</option>
+              <option value="3-col-equal" ${sessao.layout === '3-col-equal' ? 'selected' : ''}>3 Blocos (33/33/33%)</option>
+            </select>
+          </div>
+          <div>
+            <label>Cor Fundo (Hex ou Seletor)</label>
+            <div class="color-input-group">
+              <input type="color" id="color-picker-${sessao.id}" value="${sessao.corFundo}" onchange="alterarCorFundoSessao('${sessao.id}', this.value)">
+              <input type="text" id="color-text-${sessao.id}" value="${sessao.corFundo}" onchange="alterarCorFundoSessao('${sessao.id}', this.value)" placeholder="#FFFFFF" maxlength="7">
+            </div>
+          </div>
+        </div>
+        <div class="grid-editors">
+          ${sessao.blocos.map((bloco, bIndex) => `
+            <div class="block-box">
+              <label>Conteúdo ${bIndex + 1} <small style="text-transform:none; color:#888; font-weight:normal;">(Dê 2 cliques na imagem para Link)</small></label>
+              <div id="editor-${sessao.id}-${bIndex}" class="quill-editor"></div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+    container.appendChild(sBox);
+
+    // Inicialização do Quill dentro do card
+   sessao.blocos.forEach((bloco, bIndex) => {
+      const idEditor = `#editor-${sessao.id}-${bIndex}`;
+      
+      // NOVA CONFIGURAÇÃO COM HANDLER DO GITHUB
+      const quill = new Quill(idEditor, { 
+        theme: 'snow', 
+        modules: { 
+          toolbar: {
+            container: toolbarQuill,
+            handlers: {
+              image: function() {
+                const input = document.createElement('input');
+                input.setAttribute('type', 'file');
+                input.setAttribute('accept', 'image/*');
+                input.click();
+
+                input.onchange = async () => {
+                  const file = input.files[0];
+                  if (/^image\//.test(file.type)) {
+                    await uploadImageToGitHub(file, quill);
+                  }
+                };
+              }
+            }
+          }
+        } 
+      });
+      
+      // Injeção dos inputs NATIVOS de cor na barra de ferramentas do editor
+      const toolbarContainer = quill.getModule('toolbar').container;
+      const customColorGroup = document.createElement('span');
+      customColorGroup.className = 'ql-formats custom-color-wrapper';
+      customColorGroup.innerHTML = `
+         <input type="color" class="custom-ql-color" title="Cor do Texto" value="#333333">
+         <input type="color" class="custom-ql-color" title="Cor de Fundo do Texto" value="#ffffff">
+      `;
+      
+      const colorInputs = customColorGroup.querySelectorAll('input[type="color"]');
+      colorInputs[0].addEventListener('input', (e) => quill.format('color', e.target.value));
+      colorInputs[1].addEventListener('input', (e) => quill.format('background', e.target.value));
+      
+      toolbarContainer.insertBefore(customColorGroup, toolbarContainer.childNodes[2]);
+
+      quill.root.innerHTML = bloco.texto;
+      
+      // Lógica de Duplo Clique na Imagem para Link
+      quill.root.addEventListener('dblclick', (e) => {
+        if (e.target.tagName === 'IMG') {
+          const blot = Quill.find(e.target);
+          if (blot) {
+            const index = quill.getIndex(blot);
+            quill.setSelection(index, 1);
+            const urlAtual = e.target.parentElement.tagName === 'A' ? e.target.parentElement.href : '';
+            const url = prompt("🔗 Digite o link para esta imagem (ou deixe em branco para remover):", urlAtual);
+            
+            if (url !== null) {
+              if (url.trim() === '') quill.format('link', false); 
+              else quill.format('link', url);
+            }
+          }
+        }
+      });
+
+      // Atualiza o Preview ao digitar
+      quill.on('text-change', () => {
+        const currentIndex = sessoesDados.findIndex(s => s.id === sessao.id);
+        if (currentIndex !== -1) {
+          sessoesDados[currentIndex].blocos[bIndex].texto = quill.root.innerHTML;
+          salvarCacheLocal();
+          atualizarPreview();
+        }
+      });
+      instanciasQuill[`${sessao.id}-${bIndex}`] = quill;
+    });
+  });
+}
+
+function atualizarPreview() {
+  const renderArea = document.getElementById('render-area');
+  if (!renderArea) return;
+
+  renderArea.style.width = configuracaoGlobal.width + "px";
+  
+  let htmlLinhas = "";
+  let estiloBaseFonte = `font-family: ${configuracaoGlobal.fontFamily}; font-size: 15px; color: #333333; line-height: 1.5; padding: 15px;`;
+
+  // Montagem da Matriz de Tabela Baseada no Layout Selecionado
+  sessoesDados.forEach(sessao => {
+    let linhaInternaHtml = "";
+
+    if (sessao.layout === '1-col') {
+      let conteudoLimpo = converterEstilosQuillParaEmail(sessao.blocos[0].texto);
+      linhaInternaHtml = `<td valign="top" style="${estiloBaseFonte}">${conteudoLimpo}</td>`;
+    } 
+    else if (sessao.layout === '1-col-img-full') {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(sessao.blocos[0].texto, 'text/html');
+      const imgs = doc.querySelectorAll('img');
+      let imgHtml = '';
+      
+      imgs.forEach(img => {
+        // Mágica Avançada para Gmail/Outlook Compose
+        img.setAttribute('width', configuracaoGlobal.width); 
+        img.style.width = configuracaoGlobal.width + 'px'; // Pixel exato para evitar encolhimento
+        img.style.minWidth = '100%'; // Garante que não crie bordas laterais vazias
+        img.style.maxWidth = '100%';
+        img.style.display = 'block';
+        img.style.margin = '0';
+        img.style.padding = '0';
+        img.style.border = 'none';
+        img.style.height = 'auto';
+        
+        let parentLink = img.closest('a');
+        if (parentLink) {
+          parentLink.style.display = 'block';
+          parentLink.style.lineHeight = '0';
+          imgHtml += parentLink.outerHTML;
+        } else {
+          imgHtml += img.outerHTML;
+        }
+      });
+
+      if(!imgHtml) imgHtml = `<div style="text-align:center; padding:40px; color:#999; font-size:12px; font-family:sans-serif; border:1px dashed #ccc;">[Insira uma imagem para preencher 100% do layout]</div>`;
+      linhaInternaHtml = `<td valign="top" style="padding: 0; margin: 0; line-height: 0; font-size: 0;">${imgHtml}</td>`;
+    }
+    else if (sessao.layout === '2-col-50-50') {
+      let txt1 = converterEstilosQuillParaEmail(sessao.blocos[0].texto);
+      let txt2 = converterEstilosQuillParaEmail(sessao.blocos[1].texto);
+      linhaInternaHtml = `
+        <td valign="top">
+          <table border="0" cellpadding="0" cellspacing="0" width="100%" style="table-layout: fixed; width: 100%;">
+            <tr>
+              <td width="50%" valign="top" style="${estiloBaseFonte} padding-right: 15px; width: 50%; word-break: break-word;">${txt1}</td>
+              <td width="50%" valign="top" style="${estiloBaseFonte} width: 50%; word-break: break-word;">${txt2}</td>
+            </tr>
+          </table>
+        </td>`;
+    }
+    else if (sessao.layout === '2-col-30-70') {
+      let txt1 = converterEstilosQuillParaEmail(sessao.blocos[0].texto);
+      let txt2 = converterEstilosQuillParaEmail(sessao.blocos[1].texto);
+      linhaInternaHtml = `
+        <td valign="top">
+          <table border="0" cellpadding="0" cellspacing="0" width="100%" style="table-layout: fixed; width: 100%;">
+            <tr>
+              <td width="30%" valign="top" style="${estiloBaseFonte} padding-right: 15px; width: 30%; word-break: break-word;">${txt1}</td>
+              <td width="70%" valign="top" style="${estiloBaseFonte} width: 70%; word-break: break-word;">${txt2}</td>
+            </tr>
+          </table>
+        </td>`;
+    } 
+    else if (sessao.layout === '2-col-70-30') {
+      let txt1 = converterEstilosQuillParaEmail(sessao.blocos[0].texto);
+      let txt2 = converterEstilosQuillParaEmail(sessao.blocos[1].texto);
+      linhaInternaHtml = `
+        <td valign="top">
+          <table border="0" cellpadding="0" cellspacing="0" width="100%" style="table-layout: fixed; width: 100%;">
+            <tr>
+              <td width="70%" valign="top" style="${estiloBaseFonte} padding-right: 15px; width: 70%; word-break: break-word;">${txt1}</td>
+              <td width="30%" valign="top" style="${estiloBaseFonte} width: 30%; word-break: break-word;">${txt2}</td>
+            </tr>
+          </table>
+        </td>`;
+    } 
+    else if (sessao.layout === '3-col-equal') {
+      let txt1 = converterEstilosQuillParaEmail(sessao.blocos[0].texto);
+      let txt2 = converterEstilosQuillParaEmail(sessao.blocos[1].texto);
+      let txt3 = converterEstilosQuillParaEmail(sessao.blocos[2].texto);
+      linhaInternaHtml = `
+        <td valign="top">
+          <table border="0" cellpadding="0" cellspacing="0" width="100%" style="table-layout: fixed; width: 100%;">
+            <tr>
+              <td width="33.33%" valign="top" style="${estiloBaseFonte} padding-right: 10px; width: 33.33%; word-break: break-word;">${txt1}</td>
+              <td width="33.33%" valign="top" style="${estiloBaseFonte} padding-right: 10px; width: 33.33%; word-break: break-word;">${txt2}</td>
+              <td width="33.33%" valign="top" style="${estiloBaseFonte} width: 33.33%; word-break: break-word;">${txt3}</td>
+            </tr>
+          </table>
+        </td>`;
+    }
+
+    htmlLinhas += `<tr><td bgcolor="${sessao.corFundo}"><table border="0" cellpadding="0" cellspacing="0" width="100%" style="table-layout: fixed; width:100%;"><tr>${linhaInternaHtml}</tr></table></td></tr>`;
+  });
+
+  renderArea.innerHTML = `
+    <table align="center" border="0" cellpadding="0" cellspacing="0" width="${configuracaoGlobal.width}" id="tabela-principal" style="table-layout: fixed; border-collapse: collapse; background-color: #ffffff; width: ${configuracaoGlobal.width}px; max-width: ${configuracaoGlobal.width}px; word-wrap: break-word; overflow-wrap: break-word; font-family: ${configuracaoGlobal.fontFamily};">
+      ${htmlLinhas}
+    </table>
+  `;
+}
+
+
+/** * ---------------------------------------------------------
+ * 4.6. UTILITÁRIOS (SANITIZAÇÃO PARA EMAIL)
+ * ---------------------------------------------------------
+ * Converte marcações CSS do Quill para atributos HTML puros
+ * que clientes de e-mail limitados (Outlook, Gmail) aceitam.
+ */
+function converterEstilosQuillParaEmail(html) {
+  if (!html) return '';
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+  
+  doc.querySelectorAll('.ql-align-center').forEach(el => el.style.textAlign = 'center');
+  doc.querySelectorAll('.ql-align-right').forEach(el => el.style.textAlign = 'right');
+  doc.querySelectorAll('.ql-align-justify').forEach(el => el.style.textAlign = 'justify');
+  doc.querySelectorAll('.ql-align-left').forEach(el => el.style.textAlign = 'left');
+  
+
+// NOVA REGRA: Sobrescreve as dimensões originais da imagem forçando 100% em qualquer cliente
+  doc.querySelectorAll('img').forEach(img => {
+    img.setAttribute('width', '100%'); // Quebra qualquer largura física que o Quill gerou
+    img.style.width = '100%';
+    img.style.minWidth = '100%'; // Obriga o Gmail Compose a esticar a imagem
+    img.style.maxWidth = '100%';
+    img.style.height = 'auto';
+  });
+  
+  doc.querySelectorAll('p').forEach(p => {
+    p.style.margin = "0";
+    p.style.padding = "0 0 10px 0";
+    if(p.classList.contains('ql-align-center')) { p.querySelectorAll('img').forEach(img => { img.style.marginLeft = 'auto'; img.style.marginRight = 'auto'; img.style.display = 'block'; }); }
+    else if(p.classList.contains('ql-align-right')) { p.querySelectorAll('img').forEach(img => { img.style.marginLeft = 'auto'; img.style.marginRight = '0'; img.style.display = 'block'; }); }
+    else if(p.classList.contains('ql-align-left')) { p.querySelectorAll('img').forEach(img => { img.style.marginLeft = '0'; img.style.marginRight = 'auto'; img.style.display = 'block'; }); }
+  });
+  
+  doc.querySelectorAll('h1').forEach(h => { h.style.fontSize = "28px"; h.style.margin = "0 0 12px 0"; });
+  doc.querySelectorAll('h2').forEach(h => { h.style.fontSize = "22px"; h.style.margin = "0 0 10px 0"; });
+  doc.querySelectorAll('h3').forEach(h => { h.style.fontSize = "18px"; h.style.margin = "0 0 8px 0"; });
+
+  return doc.body.innerHTML;
+}
+
+
+/** * ---------------------------------------------------------
+ * 4.7. EXPORTAÇÕES (JSON, PDF, EMAIL, HTML)
+ * ---------------------------------------------------------
+ */
+function exportarTemplateJSON() {
+  const dados = { configuracaoGlobal, sessoesDados };
+  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dados));
+  const downloadAnchor = document.createElement('a');
+  downloadAnchor.setAttribute("href", dataStr);
+  downloadAnchor.setAttribute("download", "template_cms_" + Date.now() + ".json");
+  document.body.appendChild(downloadAnchor);
+  downloadAnchor.click();
+  downloadAnchor.remove();
+}
+
+function importarTemplateJSON(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const dados = JSON.parse(e.target.result);
+      if (dados.configuracaoGlobal && dados.sessoesDados) {
+        configuracaoGlobal = dados.configuracaoGlobal;
+        sessoesDados = dados.sessoesDados;
+        document.getElementById('canvas-width').value = configuracaoGlobal.width;
+        
+        const selectFont = document.getElementById('global-font');
+        let fontExiste = false;
+        for(let i=0; i<selectFont.options.length; i++) {
+          if(selectFont.options[i].value === configuracaoGlobal.fontFamily) { fontExiste = true; break; }
+        }
+        if(!fontExiste) {
+          const novaOpt = document.createElement('option');
+          novaOpt.value = configuracaoGlobal.fontFamily;
+          novaOpt.text = configuracaoGlobal.fontFamily.replace(/['"]/g, '');
+          selectFont.insertBefore(novaOpt, selectFont.lastElementChild);
+        }
+        
+        selectFont.value = configuracaoGlobal.fontFamily;
+        carregarLinkGoogleFonts(configuracaoGlobal.fontFamily);
+        salvarCacheLocal();
+        renderizarPainelEditor();
+        atualizarPreview();
+        alert("Template importado com sucesso!");
+      } else { alert("Formato de arquivo JSON inválido para este CMS."); }
+    } catch (err) { alert("Erro ao ler o arquivo JSON."); }
+  };
+  reader.readAsText(file);
+}
+
+function gerarPDFDinamico() {
+  const elemento = document.getElementById('render-area');
+  if (!elemento) return;
+  
+  const alturaReal = elemento.offsetHeight;
+  const antigoEstilo = document.getElementById('estilo-impressao-dinamica');
+  if (antigoEstilo) antigoEstilo.remove();
+  
+  const estilo = document.createElement('style');
+  estilo.id = 'estilo-impressao-dinamica';
+  estilo.innerHTML = `
+    @media print { 
+      @page { size: ${configuracaoGlobal.width}px ${alturaReal}px !important; margin: 0 !important; } 
+      body, html { margin: 0 !important; padding: 0 !important; height: ${alturaReal}px !important; overflow: hidden !important; }
+    }
+  `;
+  document.head.appendChild(estilo);
+  window.print();
+}
+
+async function exportarEmail() {
+  atualizarPreview();
+  const renderArea = document.getElementById('render-area');
+  if(!renderArea) return;
+  try {
+    const blob = new Blob([renderArea.innerHTML], { type: 'text/html' });
+    const clipboardItem = new ClipboardItem({ 'text/html': blob });
+    await navigator.clipboard.write([clipboardItem]);
+    alert("Conteúdo visual copiado para a Área de Transferência! Prontinho para colar diretamente no Outlook ou Gmail.");
+  } catch (err) {
+    const range = document.createRange();
+    range.selectNode(renderArea);
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
+    try { document.execCommand('copy'); alert("Conteúdo visual copiado via contingência!"); }
+    catch(e) { alert("Erro ao copiar conteúdo visual."); }
+  }
+}
+
+async function exportarHTML() {
+  atualizarPreview();
+  const tabela = document.getElementById('tabela-principal');
+  if(!tabela) return;
+  try {
+    await navigator.clipboard.writeText(tabela.outerHTML);
+    alert("Código HTML das tabelas copiado com sucesso! Pode colar no Mailchimp, RD Station, E-Goi, etc.");
+  } catch (err) { alert("Erro ao copiar código HTML."); }
+}
+
+// Inicia o sistema ao abrir a página
+init();
+</script>
+</body>
+</html>
