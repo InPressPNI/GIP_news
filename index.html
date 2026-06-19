@@ -385,59 +385,117 @@ function alterarCorFundoSessao(idSessao, cor) {
   atualizarPreview();
 }
 
-// --- FUNÇÃO DO GITHUB ATUALIZADA ---
+// --- FUNÇÃO PARA OTIMIZAR IMAGEM (CANVAS) ---
+function otimizarImagem(file, maxWidth = 1200, quality = 0.8) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        // Se a largura for maior que o limite, redimensiona mantendo a proporção
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        
+        // Fundo branco para evitar fundo preto em PNGs transparentes convertidos para JPG
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Converte para JPG com compressão (quality 0 a 1)
+        const base64 = canvas.toDataURL('image/jpeg', quality);
+        resolve(base64);
+      };
+      img.onerror = (err) => reject(err);
+    };
+    reader.onerror = (err) => reject(err);
+  });
+}
+
+// --- FUNÇÃO DO GITHUB ATUALIZADA (COM OTIMIZAÇÃO E LIMITE DE 1MB) ---
 async function uploadImageToGitHub(file, quillInstance) {
   const repo = GITHUB_REPO;
   const token = GITHUB_TOKEN;
 
-  if (repo === "seu-usuario/seu-repositorio" || !token) {
-    alert("⚠️ Credenciais do GitHub não configuradas no código-fonte.");
+  if (!repo || !token) {
+    alert("⚠️ Credenciais do GitHub não encontradas no arquivo config.js.");
+    return;
+  }
+
+  // Prevenção inicial: se o usuário tentar subir um arquivo de 20MB, barramos antes de tentar otimizar para não travar o navegador
+  if (file.size > 15 * 1024 * 1024) {
+    alert("❌ Arquivo muito pesado (maior que 15MB). O navegador não consegue processar. Diminua a imagem primeiro.");
     return;
   }
 
   const range = quillInstance.getSelection(true);
-  quillInstance.insertText(range.index, '⏳ Enviando imagem para o GitHub...', 'user');
+  quillInstance.insertText(range.index, '⏳ Otimizando e enviando para o GitHub...', 'user');
 
-  const reader = new FileReader();
-  reader.readAsDataURL(file);
-  reader.onloadend = async () => {
-    const base64Data = reader.result.split(',')[1];
-    const fileName = `img_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+  try {
+    // Passo 1: Otimiza a imagem (máximo 1200px de largura, 80% qualidade JPG)
+    const base64DataUrl = await otimizarImagem(file, 1200, 0.8);
+    
+    // Extrai apenas o código puro do Base64
+    const base64Data = base64DataUrl.split(',')[1];
+    
+    // Passo 2: Verifica o peso da imagem otimizada.
+    // O tamanho de uma string Base64 em bytes é cerca de 75% do tamanho da string.
+    const sizeInBytes = base64Data.length * 0.75; 
+    const sizeInMB = (sizeInBytes / (1024 * 1024)).toFixed(2);
+
+    if (sizeInBytes > 1024 * 1024) { // Maior que 1MB
+      quillInstance.deleteText(range.index, 40);
+      alert(`❌ A imagem continuou muito pesada mesmo após otimizada (${sizeInMB} MB). O limite é 1MB. Escolha outra imagem.`);
+      return;
+    }
+
+    // Cria um nome limpo e força a extensão .jpg, já que convertemos no Canvas
+    const fileName = `img_${Date.now()}_otimizada.jpg`;
     const path = `imagens/${fileName}`; 
 
     const url = `https://api.github.com/repos/${repo}/contents/${path}`;
 
-    try {
-      const response = await fetch(url, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          message: `Upload via CMS: ${fileName}`,
-          content: base64Data
-        })
-      });
+    // Passo 3: Faz o envio para a API do GitHub
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        message: `Upload otimizado via CMS: ${fileName} (${sizeInMB} MB)`,
+        content: base64Data
+      })
+    });
 
-      const data = await response.json();
-      quillInstance.deleteText(range.index, 36); 
+    const data = await response.json();
+    quillInstance.deleteText(range.index, 40); // Remove o texto "⏳ Otimizando..."
 
-      if (response.ok) {
-        const downloadUrl = data.content.download_url;
-        quillInstance.insertEmbed(range.index, 'image', downloadUrl);
-        quillInstance.setSelection(range.index + 1);
-        salvarCacheLocal();
-        atualizarPreview();
-      } else {
-        alert(`Erro do GitHub: ${data.message}`);
-      }
-    } catch (err) {
-      quillInstance.deleteText(range.index, 36);
-      alert("Erro crítico de conexão com o GitHub.");
-      console.error(err);
+    if (response.ok) {
+      const downloadUrl = data.content.download_url;
+      quillInstance.insertEmbed(range.index, 'image', downloadUrl);
+      quillInstance.setSelection(range.index + 1);
+      salvarCacheLocal();
+      atualizarPreview();
+    } else {
+      alert(`⚠️ Erro do GitHub: ${data.message}`);
     }
-  };
+  } catch (err) {
+    quillInstance.deleteText(range.index, 40);
+    alert("❌ Erro crítico ao processar ou enviar a imagem.");
+    console.error(err);
+  }
 }
 
 
