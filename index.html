@@ -8,6 +8,8 @@
  <link rel="preconnect" href="https://fonts.googleapis.com">
  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
  <link id="google-fonts-link" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap" rel="stylesheet">
+ <link rel="stylesheet" href="https://mondrian.claro.com.br/tokens/claro-tokens-latest.custom-properties.css">
+ <link rel="stylesheet" href="https://mondrian.claro.com.br/fonts/mondrian-fonts-latest.css">
 
  <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
  <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
@@ -37,7 +39,7 @@
 
  /* --- 2.3: Tipografia do Editor --- */
  h2, h3 { font-weight: 800; color: var(--primary); margin-top: 0; padding-bottom: 5px; }
- h2 { border-bottom: 2px solid var(--primary); padding-bottom: 10px; }
+ /*h2 { border-bottom: 2px solid var(--primary); padding-bottom: 10px; }*/
  label { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #333; display: block; margin-bottom: 5px; margin-top: 10px; }
  
  /* --- 2.4: Componentes de Interface (Cards, Botões e Inputs) --- */
@@ -72,6 +74,9 @@
  .btn-html:hover { background: #5a32a3; }
  .btn-template { background: #17a2b8; color: white; }
  .btn-template:hover { background: #138496; }
+
+ .custom-color-wrapper input{ float: left; margin-right: 5px;
+ }
 
  /* --- 2.5: Sistema de Grid e Minimização --- */
  .grid-editors { display: flex; gap: 15px; margin-top: 15px; flex-direction: column; }
@@ -126,6 +131,7 @@
          <option value="'Montserrat', sans-serif">Montserrat</option>
          <option value="'Georgia', serif">Georgia</option>
          <option value="'Verdana', sans-serif">Verdana</option>
+         <option value="'AMX', sans-serif">AMX</option>
          <option value="custom" style="font-weight: bold; color: var(--accent);">🔍 Outra Fonte (Google Fonts)...</option>
        </select>
      </div>
@@ -385,19 +391,33 @@ function alterarCorFundoSessao(idSessao, cor) {
   atualizarPreview();
 }
 
-// --- FUNÇÃO PARA OTIMIZAR IMAGEM (CANVAS) ---
+// --- FUNÇÃO PARA OTIMIZAR IMAGEM (DETECÇÃO BLINDADA PARA GIF E PNG) ---
 function otimizarImagem(file, maxWidth = 1200, quality = 0.8) {
   return new Promise((resolve, reject) => {
+    // Pegamos o nome do arquivo (em letras minúsculas) para garantir a detecção
+    const nomeArquivo = file.name ? file.name.toLowerCase() : '';
+    
+    // Agora ele checa o Tipo OU a Extensão no nome do arquivo
+    const isGIF = file.type === 'image/gif' || nomeArquivo.endsWith('.gif');
+    const isPNG = file.type === 'image/png' || nomeArquivo.endsWith('.png');
+
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = (event) => {
+      // SE FOR GIF: Pula o Canvas completamente e preserva a animação!
+      if (isGIF) {
+        console.log("GIF detectado de forma nativa! Pulando compressão.");
+        resolve({ base64Url: event.target.result, ext: 'gif' });
+        return;
+      }
+
+      // SE NÃO FOR GIF: Vai para o Canvas para redimensionar
       const img = new Image();
       img.src = event.target.result;
       img.onload = () => {
         let width = img.width;
         let height = img.height;
 
-        // Se a largura for maior que o limite, redimensiona mantendo a proporção
         if (width > maxWidth) {
           height = Math.round((height * maxWidth) / width);
           width = maxWidth;
@@ -408,14 +428,25 @@ function otimizarImagem(file, maxWidth = 1200, quality = 0.8) {
         canvas.height = height;
         const ctx = canvas.getContext('2d');
         
-        // Fundo branco para evitar fundo preto em PNGs transparentes convertidos para JPG
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // Fundo branco apenas se NÃO for PNG (para não estragar a transparência)
+        if (!isPNG) {
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+        
         ctx.drawImage(img, 0, 0, width, height);
 
-        // Converte para JPG com compressão (quality 0 a 1)
-        const base64 = canvas.toDataURL('image/jpeg', quality);
-        resolve(base64);
+        let base64Url;
+        let ext = 'jpg';
+        
+        if (isPNG) {
+          base64Url = canvas.toDataURL('image/png');
+          ext = 'png';
+        } else {
+          base64Url = canvas.toDataURL('image/jpeg', quality);
+        }
+        
+        resolve({ base64Url, ext });
       };
       img.onerror = (err) => reject(err);
     };
@@ -423,7 +454,7 @@ function otimizarImagem(file, maxWidth = 1200, quality = 0.8) {
   });
 }
 
-// --- FUNÇÃO DO GITHUB ATUALIZADA (COM OTIMIZAÇÃO E LIMITE DE 1MB) ---
+// --- FUNÇÃO DO GITHUB ATUALIZADA (LIMITES DINÂMICOS: 3MB PARA GIF, 1MB PARA OUTROS) ---
 async function uploadImageToGitHub(file, quillInstance) {
   const repo = GITHUB_REPO;
   const token = GITHUB_TOKEN;
@@ -433,9 +464,8 @@ async function uploadImageToGitHub(file, quillInstance) {
     return;
   }
 
-  // Prevenção inicial: se o usuário tentar subir um arquivo de 20MB, barramos antes de tentar otimizar para não travar o navegador
   if (file.size > 15 * 1024 * 1024) {
-    alert("❌ Arquivo muito pesado (maior que 15MB). O navegador não consegue processar. Diminua a imagem primeiro.");
+    alert("❌ Arquivo muito pesado (maior que 15MB). Diminua a imagem primeiro.");
     return;
   }
 
@@ -443,30 +473,33 @@ async function uploadImageToGitHub(file, quillInstance) {
   quillInstance.insertText(range.index, '⏳ Otimizando e enviando para o GitHub...', 'user');
 
   try {
-    // Passo 1: Otimiza a imagem (máximo 1200px de largura, 80% qualidade JPG)
-    const base64DataUrl = await otimizarImagem(file, 1200, 0.8);
+    // Passo 1: Otimiza a imagem (recebe um objeto com o base64 e a extensão)
+    const otimizada = await otimizarImagem(file, 1200, 0.8);
     
-    // Extrai apenas o código puro do Base64
-    const base64Data = base64DataUrl.split(',')[1];
+    // Extrai o código puro
+    const base64Data = otimizada.base64Url.split(',')[1];
     
-    // Passo 2: Verifica o peso da imagem otimizada.
-    // O tamanho de uma string Base64 em bytes é cerca de 75% do tamanho da string.
+    // Passo 2: Verifica o peso e aplica a regra dinâmica
     const sizeInBytes = base64Data.length * 0.75; 
     const sizeInMB = (sizeInBytes / (1024 * 1024)).toFixed(2);
 
-    if (sizeInBytes > 1024 * 1024) { // Maior que 1MB
+    // NOVA REGRA: 3MB se for GIF, 1MB se for JPG/PNG
+    const limiteMB = (otimizada.ext === 'gif') ? 3 : 1;
+    const limiteBytes = limiteMB * 1024 * 1024;
+
+    if (sizeInBytes > limiteBytes) { 
       quillInstance.deleteText(range.index, 40);
-      alert(`❌ A imagem continuou muito pesada mesmo após otimizada (${sizeInMB} MB). O limite é 1MB. Escolha outra imagem.`);
+      alert(`❌ A imagem (${otimizada.ext.toUpperCase()}) ficou com ${sizeInMB} MB. O limite para este formato é de ${limiteMB}MB. Escolha um arquivo mais leve.`);
       return;
     }
 
-    // Cria um nome limpo e força a extensão .jpg, já que convertemos no Canvas
-    const fileName = `img_${Date.now()}_otimizada.jpg`;
+    // Cria o nome usando a extensão dinâmica (jpg, png ou gif)
+    const fileName = `img_${Date.now()}_otimizada.${otimizada.ext}`;
     const path = `imagens/${fileName}`; 
 
     const url = `https://api.github.com/repos/${repo}/contents/${path}`;
 
-    // Passo 3: Faz o envio para a API do GitHub
+    // Passo 3: Envio para o GitHub
     const response = await fetch(url, {
       method: 'PUT',
       headers: {
@@ -474,13 +507,13 @@ async function uploadImageToGitHub(file, quillInstance) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        message: `Upload otimizado via CMS: ${fileName} (${sizeInMB} MB)`,
+        message: `Upload via CMS: ${fileName} (${sizeInMB} MB)`,
         content: base64Data
       })
     });
 
     const data = await response.json();
-    quillInstance.deleteText(range.index, 40); // Remove o texto "⏳ Otimizando..."
+    quillInstance.deleteText(range.index, 40); 
 
     if (response.ok) {
       const downloadUrl = data.content.download_url;
@@ -647,7 +680,7 @@ function atualizarPreview() {
   renderArea.style.width = configuracaoGlobal.width + "px";
   
   let htmlLinhas = "";
-  let estiloBaseFonte = `font-family: ${configuracaoGlobal.fontFamily}; font-size: 15px; color: #333333; line-height: 1.5; padding: 15px;`;
+  let estiloBaseFonte = `font-family: ${configuracaoGlobal.fontFamily}; font-size: 15px; color: #333333; line-height: 1.5; padding: 15px 40px;`;
 
   // Montagem da Matriz de Tabela Baseada no Layout Selecionado
   sessoesDados.forEach(sessao => {
@@ -747,7 +780,7 @@ function atualizarPreview() {
   });
 
   renderArea.innerHTML = `
-    <table align="center" border="0" cellpadding="0" cellspacing="0" width="${configuracaoGlobal.width}" id="tabela-principal" style="table-layout: fixed; border-collapse: collapse; background-color: #ffffff; width: ${configuracaoGlobal.width}px; max-width: ${configuracaoGlobal.width}px; word-wrap: break-word; overflow-wrap: break-word; font-family: ${configuracaoGlobal.fontFamily};">
+    <table align="center" border="0" cellpadding="0" cellspacing="0" width="${configuracaoGlobal.width}" id="tabela-principal" style="table-layout: fixed; border-collapse: collapse; background-color: #ffffff; width: ${configuracaoGlobal.width}px; max-width: ${configuracaoGlobal.width}px; word-wrap: break-word; overflow-wrap: break-word; font-family: ${configuracaoGlobal.fontFamily}; text-align: left;">
       ${htmlLinhas}
     </table>
   `;
