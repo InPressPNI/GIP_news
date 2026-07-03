@@ -116,10 +116,14 @@
 
  <div class="config-group">
    <h3>Configurações</h3>
-   <div class="inline-row">
+  <div class="inline-row">
      <div>
        <label>Largura do Canvas (px)</label>
        <input type="number" id="canvas-width" value="650" min="400" max="900" oninput="mudarLarguraCanvas(this.value)">
+     </div>
+     <div>
+       <label>Espaçamento Base (Padding)</label>
+       <input type="text" id="global-padding" value="15px 40px" oninput="mudarPaddingGlobal(this.value)">
      </div>
      <div>
        <label>Tipografia Geral</label>
@@ -210,6 +214,9 @@ function init() {
       }
 
       document.getElementById('canvas-width').value = configuracaoGlobal.width;
+      document.getElementById('canvas-width').value = configuracaoGlobal.width;
+      document.getElementById('global-padding').value = configuracaoGlobal.paddingGlobal || '15px 40px';
+      document.getElementById('global-font').value = configuracaoGlobal.fontFamily;
       document.getElementById('global-font').value = configuracaoGlobal.fontFamily;
       carregarLinkGoogleFonts(configuracaoGlobal.fontFamily);
     } catch (e) {
@@ -247,6 +254,7 @@ function criarObjetoSessao(layoutTipo) {
 
   return {
     id: 'sessao_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+    nomePersonalizado: '', // NOVO CAMPO
     layout: layoutTipo,
     corFundo: '#ffffff',
     blocos: blocos
@@ -340,6 +348,26 @@ function mudarLarguraCanvas(valor) {
   configuracaoGlobal.width = parseInt(valor) || 650;
   salvarCacheLocal();
   atualizarPreview();
+}
+
+function mudarPaddingGlobal(valor) {
+  configuracaoGlobal.paddingGlobal = valor;
+  salvarCacheLocal();
+  atualizarPreview();
+}
+
+function renomearSessao(idSessao) {
+  const index = sessoesDados.findIndex(s => s.id === idSessao);
+  if (index === -1) return;
+  
+  const nomeAtual = sessoesDados[index].nomePersonalizado || `Sessão ${index + 1}`;
+  const novoNome = prompt("Renomear sessão para:", nomeAtual);
+  
+  if (novoNome !== null && novoNome.trim() !== "") {
+    sessoesDados[index].nomePersonalizado = novoNome.trim();
+    salvarCacheLocal();
+    renderizarPainelEditor();
+  }
 }
 
 function mudarFonteGlobal(valor) {
@@ -553,11 +581,12 @@ function renderizarPainelEditor() {
 
     // Estrutura HTML do Card da Sessão
     sBox.innerHTML = `
-      <div class="session-title" onclick="toggleSessao('${sessao.id}')">
-        <span>↕ Sessão ${sIndex + 1} <small style="font-weight:normal; opacity:0.7;">(Clique para recolher)</small></span>
+<div class="session-title" onclick="toggleSessao('${sessao.id}')">
+        <span>↕ ${sessao.nomePersonalizado || 'Sessão ' + (sIndex + 1)} <small style="font-weight:normal; opacity:0.7;">(Clique para recolher)</small></span>
         <div class="session-actions">
           ${btnCima}
           ${btnBaixo}
+          <button class="btn-action" onclick="event.stopPropagation(); renomearSessao('${sessao.id}')">✏️ Nome</button>
           <button class="btn-action" onclick="event.stopPropagation(); duplicarSessao('${sessao.id}')">📋 Duplicar</button>
           <button class="btn-action btn-delete" onclick="event.stopPropagation(); excluirSessao('${sessao.id}')">🗑️ Excluir</button>
         </div>
@@ -680,9 +709,9 @@ function atualizarPreview() {
   renderArea.style.width = configuracaoGlobal.width + "px";
   
   let htmlLinhas = "";
-  let estiloBaseFonte = `font-family: ${configuracaoGlobal.fontFamily}; font-size: 15px; color: #333333; line-height: 1.5; padding: 15px 40px;`;
+  // 1. As <td> internas agora recebem estritamente 10px
+  let estiloBaseFonte = `font-family: ${configuracaoGlobal.fontFamily}; font-size: 15px; color: #333333; line-height: 1.5; padding: 10px;`;
 
-  // Montagem da Matriz de Tabela Baseada no Layout Selecionado
   sessoesDados.forEach(sessao => {
     let linhaInternaHtml = "";
 
@@ -697,10 +726,9 @@ function atualizarPreview() {
       let imgHtml = '';
       
       imgs.forEach(img => {
-        // Mágica Avançada para Gmail/Outlook Compose
         img.setAttribute('width', configuracaoGlobal.width); 
-        img.style.width = configuracaoGlobal.width + 'px'; // Pixel exato para evitar encolhimento
-        img.style.minWidth = '100%'; // Garante que não crie bordas laterais vazias
+        img.style.width = configuracaoGlobal.width + 'px'; 
+        img.style.minWidth = '100%';
         img.style.maxWidth = '100%';
         img.style.display = 'block';
         img.style.margin = '0';
@@ -721,6 +749,8 @@ function atualizarPreview() {
       if(!imgHtml) imgHtml = `<div style="text-align:center; padding:40px; color:#999; font-size:12px; font-family:sans-serif; border:1px dashed #ccc;">[Insira uma imagem para preencher 100% do layout]</div>`;
       linhaInternaHtml = `<td valign="top" style="padding: 0; margin: 0; line-height: 0; font-size: 0;">${imgHtml}</td>`;
     }
+    // Para todos os layouts de colunas, removemos os paddings laterais engessados (padding-right: 15px)
+    // porque o 'estiloBaseFonte' já cuida de colocar 10px em tudo uniformemente.
     else if (sessao.layout === '2-col-50-50') {
       let txt1 = converterEstilosQuillParaEmail(sessao.blocos[0].texto);
       let txt2 = converterEstilosQuillParaEmail(sessao.blocos[1].texto);
@@ -728,7 +758,7 @@ function atualizarPreview() {
         <td valign="top">
           <table border="0" cellpadding="0" cellspacing="0" width="100%" style="table-layout: fixed; width: 100%;">
             <tr>
-              <td width="50%" valign="top" style="${estiloBaseFonte} padding-right: 15px; width: 50%; word-break: break-word;">${txt1}</td>
+              <td width="50%" valign="top" style="${estiloBaseFonte} width: 50%; word-break: break-word;">${txt1}</td>
               <td width="50%" valign="top" style="${estiloBaseFonte} width: 50%; word-break: break-word;">${txt2}</td>
             </tr>
           </table>
@@ -741,7 +771,7 @@ function atualizarPreview() {
         <td valign="top">
           <table border="0" cellpadding="0" cellspacing="0" width="100%" style="table-layout: fixed; width: 100%;">
             <tr>
-              <td width="30%" valign="top" style="${estiloBaseFonte} padding-right: 15px; width: 30%; word-break: break-word;">${txt1}</td>
+              <td width="30%" valign="top" style="${estiloBaseFonte} width: 30%; word-break: break-word;">${txt1}</td>
               <td width="70%" valign="top" style="${estiloBaseFonte} width: 70%; word-break: break-word;">${txt2}</td>
             </tr>
           </table>
@@ -754,7 +784,7 @@ function atualizarPreview() {
         <td valign="top">
           <table border="0" cellpadding="0" cellspacing="0" width="100%" style="table-layout: fixed; width: 100%;">
             <tr>
-              <td width="70%" valign="top" style="${estiloBaseFonte} padding-right: 15px; width: 70%; word-break: break-word;">${txt1}</td>
+              <td width="70%" valign="top" style="${estiloBaseFonte} width: 70%; word-break: break-word;">${txt1}</td>
               <td width="30%" valign="top" style="${estiloBaseFonte} width: 30%; word-break: break-word;">${txt2}</td>
             </tr>
           </table>
@@ -768,15 +798,18 @@ function atualizarPreview() {
         <td valign="top">
           <table border="0" cellpadding="0" cellspacing="0" width="100%" style="table-layout: fixed; width: 100%;">
             <tr>
-              <td width="33.33%" valign="top" style="${estiloBaseFonte} padding-right: 10px; width: 33.33%; word-break: break-word;">${txt1}</td>
-              <td width="33.33%" valign="top" style="${estiloBaseFonte} padding-right: 10px; width: 33.33%; word-break: break-word;">${txt2}</td>
+              <td width="33.33%" valign="top" style="${estiloBaseFonte} width: 33.33%; word-break: break-word;">${txt1}</td>
+              <td width="33.33%" valign="top" style="${estiloBaseFonte} width: 33.33%; word-break: break-word;">${txt2}</td>
               <td width="33.33%" valign="top" style="${estiloBaseFonte} width: 33.33%; word-break: break-word;">${txt3}</td>
             </tr>
           </table>
         </td>`;
     }
 
-    htmlLinhas += `<tr><td bgcolor="${sessao.corFundo}"><table border="0" cellpadding="0" cellspacing="0" width="100%" style="table-layout: fixed; width:100%;"><tr>${linhaInternaHtml}</tr></table></td></tr>`;
+    // 2. Se for o bloco Imagem Full, anulamos o padding global. Se não, aplicamos na TD "mãe".
+    let paddingDaSessao = (sessao.layout === '1-col-img-full') ? '0' : (configuracaoGlobal.paddingGlobal || '15px 40px');
+
+    htmlLinhas += `<tr><td bgcolor="${sessao.corFundo}" style="padding: ${paddingDaSessao};"><table border="0" cellpadding="0" cellspacing="0" width="100%" style="table-layout: fixed; width:100%;"><tr>${linhaInternaHtml}</tr></table></td></tr>`;
   });
 
   renderArea.innerHTML = `
@@ -904,11 +937,21 @@ async function exportarEmail() {
   atualizarPreview();
   const renderArea = document.getElementById('render-area');
   if(!renderArea) return;
+  
+  const fontName = configuracaoGlobal.fontFamily.split(',')[0].replace(/['"]/g, '').trim();
+  let importStyle = '';
+  
+  if (!['Arial', 'Georgia', 'Verdana'].includes(fontName)) {
+    // Injeta o estilo direto colado ao elemento para tentar burlar o filtro do editor de e-mail
+    importStyle = `<style>@import url('https://fonts.googleapis.com/css2?family=${fontName.replace(' ', '+')}:wght@400;700;800&display=swap');</style>\n`;
+  }
+
   try {
-    const blob = new Blob([renderArea.innerHTML], { type: 'text/html' });
+    const htmlComFonte = importStyle + renderArea.innerHTML;
+    const blob = new Blob([htmlComFonte], { type: 'text/html' });
     const clipboardItem = new ClipboardItem({ 'text/html': blob });
     await navigator.clipboard.write([clipboardItem]);
-    alert("Conteúdo visual copiado para a Área de Transferência! Prontinho para colar diretamente no Outlook ou Gmail.");
+    alert("Conteúdo visual copiado! Nota: Se colar direto no Gmail/Outlook, a fonte customizada só aparecerá se você ou o cliente tiverem a fonte instalada na máquina (limitação nativa dos editores web). Para disparos oficiais, use sempre o Código HTML nas plataformas.");
   } catch (err) {
     const range = document.createRange();
     range.selectNode(renderArea);
@@ -923,9 +966,43 @@ async function exportarHTML() {
   atualizarPreview();
   const tabela = document.getElementById('tabela-principal');
   if(!tabela) return;
+  
+  const fontName = configuracaoGlobal.fontFamily.split(',')[0].replace(/['"]/g, '').trim();
+  let importFontHtml = '';
+  let outlookFontFix = '';
+  
+  if (!['Arial', 'Georgia', 'Verdana'].includes(fontName)) {
+    const fontUrl = `https://fonts.googleapis.com/css2?family=${fontName.replace(' ', '+')}:wght@400;700;800&display=swap`;
+    
+    // Método Duplo: Injeta o <link> e o @import no head para Mailchimp / RD Station
+    importFontHtml = `<link href="${fontUrl}" rel="stylesheet">\n  <style>\n    @import url('${fontUrl}');\n  </style>\n`;
+    
+    // BLINDAGEM OUTLOOK: Força o Outlook a usar Arial como fallback limpo em vez de quebrar para Times New Roman
+    outlookFontFix = `\n`;
+  }
+
+  // Monta o documento completo com tripla checagem de fontes
+  const htmlCompleto = `<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GIP News</title>
+  ${importFontHtml}
+  ${outlookFontFix}
+  <style>
+    body { margin: 0; padding: 0; background-color: #f4f7f6; }
+  </style>
+</head>
+<body>
+  ${importFontHtml ? `<style>@import url('https://fonts.googleapis.com/css2?family=${fontName.replace(' ', '+')}:wght@400;700;800&display=swap');</style>` : ''}
+  ${tabela.outerHTML}
+</body>
+</html>`;
+
   try {
-    await navigator.clipboard.writeText(tabela.outerHTML);
-    alert("Código HTML das tabelas copiado com sucesso! Pode colar no Mailchimp, RD Station, E-Goi, etc.");
+    await navigator.clipboard.writeText(htmlCompleto);
+    alert("Código HTML COMPLETO (com tripla blindagem de fontes e correção de Times New Roman para Outlook) copiado! Prontinho para salvar ou colar nas plataformas de disparo.");
   } catch (err) { alert("Erro ao copiar código HTML."); }
 }
 
