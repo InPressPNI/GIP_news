@@ -128,15 +128,12 @@
      <div>
        <label>Tipografia Geral</label>
        <select id="global-font" onchange="mudarFonteGlobal(this.value)">
-         <option value="'Inter', Arial, sans-serif">Inter</option>
-         <option value="'Arial', sans-serif">Arial</option>
-         <option value="'Roboto', sans-serif">Roboto</option>
-         <option value="'Open Sans', sans-serif">Open Sans</option>
-         <option value="'Montserrat', sans-serif">Montserrat</option>
+         <option value="'Arial', Helvetica, sans-serif">Arial</option>
+         <option value="'Helvetica', Arial, sans-serif">Helvetica</option>
+         <option value="'Verdana', Geneva, sans-serif">Verdana</option>
+         <option value="'Tahoma', Geneva, sans-serif">Tahoma</option>
          <option value="'Georgia', serif">Georgia</option>
-         <option value="'Verdana', sans-serif">Verdana</option>
-         <option value="'AMX', sans-serif">AMX</option>
-         <option value="custom" style="font-weight: bold; color: var(--accent);">🔍 Outra Fonte (Google Fonts)...</option>
+         <option value="'Times New Roman', Times, serif">Times New Roman</option>
        </select>
      </div>
    </div>
@@ -175,7 +172,7 @@
  * ---------------------------------------------------------
  */
 
-let configuracaoGlobal = { width: 650, fontFamily: "'Inter', Arial, sans-serif" };
+let configuracaoGlobal = { width: 650, fontFamily: "'Arial', Helvetica, sans-serif", paddingGlobal: "15px 40px" };
 let sessoesDados = []; // Armazena a estrutura de blocos e textos
 let instanciasQuill = {}; // Armazena as instâncias ativas do editor
 let sessoesColapsadas = {}; // Controle de UI (quais sessões estão minimizadas)
@@ -200,25 +197,11 @@ function init() {
       const dados = JSON.parse(cache);
       configuracaoGlobal = Object.assign(configuracaoGlobal, dados.configuracaoGlobal);
       sessoesDados = dados.sessoesDados || [];
-      
-      let fontExiste = false;
-      const selectFont = document.getElementById('global-font');
-      for(let i=0; i<selectFont.options.length; i++) {
-        if(selectFont.options[i].value === configuracaoGlobal.fontFamily) { fontExiste = true; break; }
-      }
-      if(!fontExiste && configuracaoGlobal.fontFamily !== 'custom') {
-        const novaOpt = document.createElement('option');
-        novaOpt.value = configuracaoGlobal.fontFamily;
-        novaOpt.text = configuracaoGlobal.fontFamily.replace(/['"]/g, '');
-        selectFont.insertBefore(novaOpt, selectFont.lastElementChild);
-      }
 
       document.getElementById('canvas-width').value = configuracaoGlobal.width;
       document.getElementById('canvas-width').value = configuracaoGlobal.width;
       document.getElementById('global-padding').value = configuracaoGlobal.paddingGlobal || '15px 40px';
       document.getElementById('global-font').value = configuracaoGlobal.fontFamily;
-      document.getElementById('global-font').value = configuracaoGlobal.fontFamily;
-      carregarLinkGoogleFonts(configuracaoGlobal.fontFamily);
     } catch (e) {
       console.error("Erro ao ler cache local");
     }
@@ -371,30 +354,11 @@ function renomearSessao(idSessao) {
 }
 
 function mudarFonteGlobal(valor) {
-  if (valor === 'custom') {
-    const customFont = prompt("Digite o nome exato da fonte do Google Fonts (ex: Open Sans, Lora):");
-    if (customFont && customFont.trim() !== "") {
-      const formattedFont = `'${customFont.trim()}', sans-serif`;
-      const selectFont = document.getElementById('global-font');
-      const novaOpt = document.createElement('option');
-      novaOpt.value = formattedFont;
-      novaOpt.text = customFont.trim();
-      selectFont.insertBefore(novaOpt, selectFont.lastElementChild);
-      
-      configuracaoGlobal.fontFamily = formattedFont;
-      selectFont.value = formattedFont;
-      carregarLinkGoogleFonts(formattedFont);
-    } else {
-      document.getElementById('global-font').value = configuracaoGlobal.fontFamily;
-      return;
-    }
-  } else {
-    configuracaoGlobal.fontFamily = valor;
-    carregarLinkGoogleFonts(valor);
-  }
+  configuracaoGlobal.fontFamily = valor;
   salvarCacheLocal();
   atualizarPreview();
 }
+// Obs: A função carregarLinkGoogleFonts foi totalmente apagada, pois não usaremos mais fontes externas.
 
 function carregarLinkGoogleFonts(fontValue) {
   const fontName = fontValue.split(',')[0].replace(/['"]/g, '');
@@ -937,21 +901,12 @@ async function exportarEmail() {
   atualizarPreview();
   const renderArea = document.getElementById('render-area');
   if(!renderArea) return;
-  
-  const fontName = configuracaoGlobal.fontFamily.split(',')[0].replace(/['"]/g, '').trim();
-  let importStyle = '';
-  
-  if (!['Arial', 'Georgia', 'Verdana'].includes(fontName)) {
-    // Injeta o estilo direto colado ao elemento para tentar burlar o filtro do editor de e-mail
-    importStyle = `<style>@import url('https://fonts.googleapis.com/css2?family=${fontName.replace(' ', '+')}:wght@400;700;800&display=swap');</style>\n`;
-  }
 
   try {
-    const htmlComFonte = importStyle + renderArea.innerHTML;
-    const blob = new Blob([htmlComFonte], { type: 'text/html' });
+    const blob = new Blob([renderArea.innerHTML], { type: 'text/html' });
     const clipboardItem = new ClipboardItem({ 'text/html': blob });
     await navigator.clipboard.write([clipboardItem]);
-    alert("Conteúdo visual copiado! Nota: Se colar direto no Gmail/Outlook, a fonte customizada só aparecerá se você ou o cliente tiverem a fonte instalada na máquina (limitação nativa dos editores web). Para disparos oficiais, use sempre o Código HTML nas plataformas.");
+    alert("Conteúdo visual copiado para a Área de Transferência com sucesso!");
   } catch (err) {
     const range = document.createRange();
     range.selectNode(renderArea);
@@ -966,43 +921,25 @@ async function exportarHTML() {
   atualizarPreview();
   const tabela = document.getElementById('tabela-principal');
   if(!tabela) return;
-  
-  const fontName = configuracaoGlobal.fontFamily.split(',')[0].replace(/['"]/g, '').trim();
-  let importFontHtml = '';
-  let outlookFontFix = '';
-  
-  if (!['Arial', 'Georgia', 'Verdana'].includes(fontName)) {
-    const fontUrl = `https://fonts.googleapis.com/css2?family=${fontName.replace(' ', '+')}:wght@400;700;800&display=swap`;
-    
-    // Método Duplo: Injeta o <link> e o @import no head para Mailchimp / RD Station
-    importFontHtml = `<link href="${fontUrl}" rel="stylesheet">\n  <style>\n    @import url('${fontUrl}');\n  </style>\n`;
-    
-    // BLINDAGEM OUTLOOK: Força o Outlook a usar Arial como fallback limpo em vez de quebrar para Times New Roman
-    outlookFontFix = `\n`;
-  }
 
-  // Monta o documento completo com tripla checagem de fontes
   const htmlCompleto = `<!DOCTYPE html>
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GIP News</title>
-  ${importFontHtml}
-  ${outlookFontFix}
   <style>
     body { margin: 0; padding: 0; background-color: #f4f7f6; }
   </style>
 </head>
 <body>
-  ${importFontHtml ? `<style>@import url('https://fonts.googleapis.com/css2?family=${fontName.replace(' ', '+')}:wght@400;700;800&display=swap');</style>` : ''}
   ${tabela.outerHTML}
 </body>
 </html>`;
 
   try {
     await navigator.clipboard.writeText(htmlCompleto);
-    alert("Código HTML COMPLETO (com tripla blindagem de fontes e correção de Times New Roman para Outlook) copiado! Prontinho para salvar ou colar nas plataformas de disparo.");
+    alert("Código HTML COMPLETO copiado com sucesso! Pode colar nas plataformas de disparo.");
   } catch (err) { alert("Erro ao copiar código HTML."); }
 }
 
