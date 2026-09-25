@@ -7,9 +7,11 @@
  
  <link rel="preconnect" href="https://fonts.googleapis.com">
  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
- <link id="google-fonts-link" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap" rel="stylesheet">
+ <link href="https://fonts.googleapis.com/css2?family=Work+Sans:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
  <link rel="stylesheet" href="https://mondrian.claro.com.br/tokens/claro-tokens-latest.custom-properties.css">
  <link rel="stylesheet" href="https://mondrian.claro.com.br/fonts/mondrian-fonts-latest.css">
+ <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+
 
  <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
  <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
@@ -19,11 +21,11 @@
  
  <style>
  /* --- 2.1: Variáveis e Layout Base --- */
- :root { --primary: #2b3e50; --bg: #f4f7f6; --accent: #fe3e09; }
+ :root { --primary: #002842; --bg: #f4f7f6; --accent: #fe3e09; }
  
  @media screen {
-   body { font-family: 'Arial', sans-serif; margin: 0; background: var(--bg); display: flex; height: 100vh; overflow: hidden; }
-   #editor-panel { width: 45%; padding: 20px 30px; background: #ededf5; overflow-y: auto; box-shadow: 2px 0 10px rgba(0,0,0,0.05); box-sizing: border-box; }
+   body { font-family: "Work Sans", sans-serif; margin: 0; background: var(--bg); display: flex; height: 100vh; overflow: hidden; }
+   #editor-panel { width: 45%; padding: 20px 30px; background: #ffffff; overflow-y: auto; box-shadow: 2px 0 10px rgba(0,0,0,0.05); box-sizing: border-box; }
    #preview-panel { width: 55%; padding: 40px 20px; overflow-y: auto; display: flex; flex-direction: column; align-items: center; background: #fcfcfc; box-sizing: border-box; }
    #render-area { background: white; box-shadow: 0 0 10px rgba(0,0,0,0.1); transition: width 0.3s ease; width: 650px; }
    .no-print { display: block; }
@@ -38,20 +40,22 @@
  }
 
  /* --- 2.3: Tipografia do Editor --- */
- h2, h3 { font-weight: 800; color: var(--primary); margin-top: 0; padding-bottom: 5px; }
+ h2, h3 {color: var(--primary); margin-top: 0; padding-bottom: 5px; }
+ h2 {font-size: 30px; font-weight: bold;}
+ h3 {font-weight: 600; margin-bottom: 5px;}
  /*h2 { border-bottom: 2px solid var(--primary); padding-bottom: 10px; }*/
- label { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #333; display: block; margin-bottom: 5px; margin-top: 10px; }
+ label { font-size: 14px; font-weight: 500; color: #002842; display: block; margin-bottom: 5px; margin-top: 10px; }
  
  /* --- 2.4: Componentes de Interface (Cards, Botões e Inputs) --- */
- .config-group { background: #ffffff; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ced4da; }
- .session-container { background: #ffffff; padding: 15px; border-radius: 8px; margin-bottom: 25px; border: 1px solid #ced4da; border-left: 6px solid #6c757d; }
- .session-title { font-size: 13px; font-weight: 800; text-transform: uppercase; margin-bottom: 15px; color: #495057; display: flex; justify-content: space-between; align-items: center; background: #f1f3f5; padding: 8px 12px; border-radius: 4px; cursor: pointer; user-select: none; }
+ .config-group { background: #F6F5F2; padding: 40px; border-radius: 20px; margin-bottom: 20px; }
+ .session-container { background: #F6F5F2; padding: 15px; border-radius: 8px; margin-bottom: 25px;}
+ .session-title { font-size: 15px; font-weight: 600; text-transform: uppercase; margin-bottom: 15px; color: #002842; display: flex; justify-content: space-between; align-items: center; padding: 8px 12px 24px 8px; cursor: pointer; user-select: none; border-bottom:1px solid #CCCBC9; }
  .session-actions { display: flex; gap: 5px; }
  
- .btn-action { background: #fff; border: 1px solid #ccc; padding: 4px 8px; font-size: 12px; border-radius: 4px; cursor: pointer; transition: 0.1s; font-weight: normal; text-transform: none; }
- .btn-action:hover { background: #e2e6ea; border-color: #adb5bd; }
- .btn-delete { color: #fff; background: #dc3545; border-color: #dc3545; }
- .btn-delete:hover { background: #c82333; border-color: #bd2130; }
+ .btn-action { background: transparent; border: 0px solid #CCCBC8; padding: 4px 8px; font-size: 14px; border-radius: 4px; cursor: pointer; transition: 0.1s; font-weight: 600; text-transform: none; color:#36348D; }
+ .btn-action:hover { background: #322A73; color:#fff; }
+ .btn-delete { color: #DB0000; background: transparent;}
+ .btn-delete:hover { background: #D01000; color: #fff; }
 
  input[type="text"], select, input[type="number"] { width: 100%; box-sizing: border-box; margin-bottom: 12px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
  .inline-row { display: flex; gap: 15px; }
@@ -63,24 +67,24 @@
  .color-input-group input[type="text"] { margin-bottom: 0; flex: 1; font-family: monospace; }
 
  /* Botões Principais */
- .btn { padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: 700; margin-bottom: 10px; width: 100%; text-transform: uppercase; letter-spacing: 0.5px; transition: 0.2s; text-align: center; font-size: 13px; }
- .btn-add { background: var(--primary); color: white; margin-bottom: 20px; }
- .btn-add:hover { background: #1a2632; }
- .btn-export { background: #28a745; color: white; }
+ .btn { padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; margin-bottom: 10px; width: 100%; letter-spacing: 0.5px; transition: 0.2s; text-align: center; font-size: 15px; }
+ .btn-add { background: #36348D; color: white; margin-bottom: 20px; }
+ .btn-add:hover { background: #322A73; }
+ .btn-export { background: #159048; color: white; }
  .btn-export:hover { background: #218838; }
- .btn-pdf { background: #ff8400; color: white; }
+ .btn-pdf { background: #F53900; color: white; }
  .btn-pdf:hover { background: #d35400; }
- .btn-html { background: #6f42c1; color: white; }
+ .btn-html { background: #5F25E7; color: white; }
  .btn-html:hover { background: #5a32a3; }
- .btn-template { background: #17a2b8; color: white; }
- .btn-template:hover { background: #138496; }
+ .btn-template { background: #E14119; color: white; }
+ .btn-template:hover { background: #CC3B16; }
 
  .custom-color-wrapper input{ float: left; margin-right: 5px;
  }
 
  /* --- 2.5: Sistema de Grid e Minimização --- */
  .grid-editors { display: flex; gap: 15px; margin-top: 15px; flex-direction: column; }
- .block-box { background: #fdfdfd; padding: 15px; border-radius: 6px; border: 1px dashed #ced4da; flex: 1; }
+ .block-box { background: #f6f5f2; padding: 15px; border-radius: 6px; border: 1px dashed #CCCBC9; flex: 1; }
  .session-container.collapsed .content-wrapper { display: none; }
  .session-container.collapsed { margin-bottom: 15px; padding-bottom: 10px; }
  .session-container.collapsed .session-title { margin-bottom: 0; }
@@ -106,27 +110,27 @@
  /* --- 2.7: Preview Visual --- */
  /* Placeholders pontilhados (só aparecem no hover, não vão pro HTML final) */
  #render-area td { border: 1px dashed transparent; transition: border 0.3s; }
- #render-area:hover td { border: 1px dashed #d1d5db; }
+ #render-area:hover td { border: 1px dashed #F53900; }
  </style>
 </head>
 <body>
 
 <div id="editor-panel" class="no-print">
- <h2>GIP News - Editor</h2>
+ <h2>Painel editor</h2>
 
  <div class="config-group">
-   <h3>Configurações</h3>
+   <h3>Configurações da página</h3>
   <div class="inline-row">
      <div>
-       <label>Largura do Canvas (px)</label>
+       <label>Largura da página</label>
        <input type="number" id="canvas-width" value="650" min="400" max="900" oninput="mudarLarguraCanvas(this.value)">
      </div>
      <div>
-       <label>Espaçamento Base (Padding)</label>
+       <label>Margens internas</label>
        <input type="text" id="global-padding" value="15px 40px" oninput="mudarPaddingGlobal(this.value)">
      </div>
      <div>
-       <label>Tipografia Geral</label>
+       <label>Fonte do texto</label>
        <select id="global-font" onchange="mudarFonteGlobal(this.value)">
          <option value="'Arial', Helvetica, sans-serif">Arial</option>
          <option value="'Helvetica', Arial, sans-serif">Helvetica</option>
@@ -140,27 +144,27 @@
    </div>
 
      <div class="inline-row" style="margin-top: 5px;">
-         <div><button class="btn btn-template" style="padding: 8px; font-size:11px;" onclick="exportarTemplateJSON()">💾 Salvar Template</button></div>
+         <div><button class="btn btn-template" style="padding: 8px; font-size:15px;" onclick="exportarTemplateJSON()">💾 Salvar Template</button></div>
      <div>
-       <button class="btn btn-template" style="padding: 8px; font-size:11px; background:#6c757d;" onclick="document.getElementById('import-file').click()">📂 Importar Template</button>
+       <button class="btn btn-template" style="padding: 8px; font-size:15px; background:#17869D;" onclick="document.getElementById('import-file').click()">📂 Importar Template</button>
        <input type="file" id="import-file" style="display:none;" accept=".json" onchange="importarTemplateJSON(event)">
      </div>
    </div>
  </div>
 
- <button class="btn btn-add" onclick="adicionarNovaSessao()">➕ Adicionar Nova Sessão</button>
+ <button class="btn btn-add" onclick="adicionarNovaSessao()">🗒️ Adicionar Nova Sessão</button>
  
  <div id="lista-sessoes"></div>
  
  <hr style="border:0; border-top:1px solid #ccc; margin:20px 0;">
  
- <button class="btn btn-pdf" onclick="gerarPDFDinamico()">📥 Salvar / Imprimir PDF</button>
- <button class="btn btn-export" onclick="exportarEmail()">📋 Copiar para E-mail (Visual)</button>
+ <button class="btn btn-pdf" onclick="gerarPDFDinamico()">💾 Salvar PDF</button>
+ <button class="btn btn-export" onclick="exportarEmail()">✉️ Copiar para E-mail</button>
  <button class="btn btn-html" onclick="exportarHTML()">💻 Copiar Código HTML</button>
 </div>
 
 <div id="preview-panel">
- <p style="font-size: 11px; color: #888; margin-top: -20px; margin-bottom: 20px;">*Passe o mouse sobre a área abaixo para visualizar as divisões de bloco.</p>
+ <p style="font-size: 11px; color: #F53900; margin-top: -20px; margin-bottom: 20px;">*Passe o mouse sobre a área abaixo para visualizar as divisões de bloco.</p>
  
  <div id="render-area"></div>
 </div>
@@ -541,17 +545,17 @@ function renderizarPainelEditor() {
     sBox.id = `box-${sessao.id}`;
     sBox.style.borderLeftColor = sIndex % 2 === 0 ? 'var(--primary)' : 'var(--accent)';
 
-    let btnCima = sIndex > 0 ? `<button class="btn-action" onclick="event.stopPropagation(); moverSessao('${sessao.id}', 'cima')">▲</button>` : '';
-    let btnBaixo = sIndex < sessoesDados.length - 1 ? `<button class="btn-action" onclick="event.stopPropagation(); moverSessao('${sessao.id}', 'baixo')">▼</button>` : '';
+    let btnCima = sIndex > 0 ? `<button class="btn-action" onclick="event.stopPropagation(); moverSessao('${sessao.id}', 'cima')">🔼  Posição</button>` : '';
+    let btnBaixo = sIndex < sessoesDados.length - 1 ? `<button class="btn-action" onclick="event.stopPropagation(); moverSessao('${sessao.id}', 'baixo')">⬇️  Posição</button>` : '';
 
     // Estrutura HTML do Card da Sessão
     sBox.innerHTML = `
 <div class="session-title" onclick="toggleSessao('${sessao.id}')">
-        <span>↕ ${sessao.nomePersonalizado || 'Sessão ' + (sIndex + 1)} <small style="font-weight:normal; opacity:0.7;">(Clique para recolher)</small></span>
+        <span>↕ ${sessao.nomePersonalizado || 'Sessão ' + (sIndex + 1)} <small style="font-weight:normal; opacity:0.7;"> <br>(Clique para recolher)</small></span>
         <div class="session-actions">
           ${btnCima}
           ${btnBaixo}
-          <button class="btn-action" onclick="event.stopPropagation(); renomearSessao('${sessao.id}')">✏️ Nome</button>
+          <button class="btn-action" onclick="event.stopPropagation(); renomearSessao('${sessao.id}')">✏️ Renomear</button>
           <button class="btn-action" onclick="event.stopPropagation(); duplicarSessao('${sessao.id}')">📋 Duplicar</button>
           <button class="btn-action btn-delete" onclick="event.stopPropagation(); excluirSessao('${sessao.id}')">🗑️ Excluir</button>
         </div>
@@ -559,7 +563,7 @@ function renderizarPainelEditor() {
       <div class="content-wrapper">
         <div class="inline-row">
           <div>
-            <label>Estrutura</label>
+            <label>Estrutura da sessão</label>
             <select onchange="alterarLayoutSessao('${sessao.id}', this.value)">
               <option value="1-col" ${sessao.layout === '1-col' ? 'selected' : ''}>1 Bloco (100% Padrão)</option>
               <option value="1-col-img-full" ${sessao.layout === '1-col-img-full' ? 'selected' : ''}>1 Imagem Full (100% sem bordas)</option>
@@ -570,7 +574,7 @@ function renderizarPainelEditor() {
             </select>
           </div>
           <div>
-            <label>Cor Fundo (Hex ou Seletor)</label>
+            <label>Cor da sessão</label>
             <div class="color-input-group">
               <input type="color" id="color-picker-${sessao.id}" value="${sessao.corFundo}" onchange="alterarCorFundoSessao('${sessao.id}', this.value)">
               <input type="text" id="color-text-${sessao.id}" value="${sessao.corFundo}" onchange="alterarCorFundoSessao('${sessao.id}', this.value)" placeholder="#FFFFFF" maxlength="7">
